@@ -1,0 +1,6 @@
+{
+  "name": "Global Care - Nurse Recruitment",
+  "description": "Professional landing page for recruiting nurses to a multinational healthcare company.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
