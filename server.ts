@@ -3,12 +3,15 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
-import { GoogleGenAI, Type } from "@google/genai";
+import { extractTextFromImage, destroyOcrService } from "./lib/ocr.js";
+import { parseOcrText } from "./lib/parse-ocr.js";
+import { extractTextFromCv } from "./lib/extract-cv.js";
+import { parseCvText } from "./lib/parse-cv.js";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per file
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file (OCR needs room)
   }
 });
 
@@ -23,46 +26,15 @@ async function startServer() {
   app.post("/api/extract", upload.single('file'), async (req: any, res: any) => {
     try {
       const file = req.file;
-      if (!file || !process.env.GEMINI_API_KEY) {
+      if (!file) {
         return res.json({ extractedData: {} });
       }
 
-      const ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
-
-      const parts = [{
-        inlineData: {
-          mimeType: file.mimetype,
-          data: file.buffer.toString("base64"),
-        }
-      }, {
-        text: "Extract candidate information from this document. Focus on full name, phone number, email, and nursing license number if available."
-      }];
-
-      const aiResponse = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: { parts },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              extractedName: { type: Type.STRING },
-              extractedEmail: { type: Type.STRING },
-              extractedPhone: { type: Type.STRING },
-              extractedLicense: { type: Type.STRING },
-            }
-          }
-        }
-      });
-
-      let extractedData = {};
-      if (aiResponse.text) {
-         extractedData = JSON.parse(aiResponse.text);
-      }
-      res.json({ extractedData });
+      const { text } = await extractTextFromCv(file.buffer, file.mimetype);
+      const ocrData = parseOcrText(text);
+      const cvData = parseCvText(text);
+      const mergedData = { ...ocrData, ...cvData };
+      res.json({ extractedData: mergedData });
     } catch (error: any) {
       console.warn("Extraction error (handled):", error);
       res.json({ extractedData: {} });
@@ -79,63 +51,24 @@ async function startServer() {
       const cvFile = files?.['cv']?.[0];
       const pncFile = files?.['pnc']?.[0];
 
-      let extractedData: any = {};
+      let extractedData: Record<string, string | undefined> = {};
 
-      if (process.env.GEMINI_API_KEY && (cvFile || pncFile)) {
-        const ai = new GoogleGenAI({
-          apiKey: process.env.GEMINI_API_KEY,
-          httpOptions: {
-            headers: { 'User-Agent': 'aistudio-build' }
-          }
-        });
+      if (cvFile || pncFile) {
+        const texts: string[] = [];
 
-        const parts: any[] = [];
         if (cvFile) {
-           parts.push({
-             inlineData: {
-               mimeType: cvFile.mimetype,
-               data: cvFile.buffer.toString("base64"),
-             }
-           });
+          const { text } = await extractTextFromCv(cvFile.buffer, cvFile.mimetype);
+          texts.push(text);
         }
         if (pncFile) {
-           parts.push({
-             inlineData: {
-               mimeType: pncFile.mimetype,
-               data: pncFile.buffer.toString("base64"),
-             }
-           });
+          const text = await extractTextFromImage(pncFile.buffer);
+          texts.push(text);
         }
-        parts.push({
-          text: "Extract candidate information from the provided CV and/or PNC license documents. Focus on finding full name, phone number, email, and any license details. If the documents are not provided or not readable, extract whatever is available."
-        });
 
-        try {
-          const aiResponse = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
-            contents: { parts },
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  extractedName: { type: Type.STRING },
-                  extractedEmail: { type: Type.STRING },
-                  extractedPhone: { type: Type.STRING },
-                  extractedLicense: { type: Type.STRING },
-                  education: { type: Type.STRING },
-                  experience: { type: Type.STRING }
-                }
-              }
-            }
-          });
-          
-          if (aiResponse.text) {
-             extractedData = JSON.parse(aiResponse.text);
-          }
-        } catch (e) {
-          console.warn("Gemini extraction error (handled):", e);
-        }
+        const combinedText = texts.join("\n---\n");
+        const ocrData = parseOcrText(combinedText);
+        const cvData = parseCvText(combinedText);
+        extractedData = { ...ocrData, ...cvData };
       }
 
       const finalName = fullName || extractedData.extractedName;
@@ -201,6 +134,16 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
+  });
+
+  // Clean up OCR service on shutdown
+  process.on("SIGTERM", async () => {
+    await destroyOcrService();
+    process.exit(0);
+  });
+  process.on("SIGINT", async () => {
+    await destroyOcrService();
+    process.exit(0);
   });
 }
 

@@ -233,7 +233,7 @@ export default function Survey() {
             </div>
             <div className="field">
               <label>Name of institution(s) where currently or previously employed</label>
-              <input type="text" placeholder="e.g. Aga Khan Hospital, Liaquat National..." onChange={updateProgress} />
+              <input type="text" placeholder="e.g. Aga Khan Hospital, Liaquat National..." defaultValue={extractedData.extractedCurrentEmployer || extractedData.extractedExperience || ''} onChange={updateProgress} />
             </div>
           </div>
         </div>

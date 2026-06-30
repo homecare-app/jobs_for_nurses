@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ShieldCheck, FileText, BadgeCheck, UploadCloud, CheckCircle2, Globe2 } from 'lucide-react';
+import { ShieldCheck, FileText, BadgeCheck, UploadCloud, CheckCircle2, Globe2, ChevronDown, ChevronUp, Briefcase, GraduationCap, Wrench, MapPin, Languages } from 'lucide-react';
 
 export default function Hero() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,7 +16,15 @@ export default function Hero() {
   const [licenseNumber, setLicenseNumber] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [address, setAddress] = useState('');
+  const [languages, setLanguages] = useState('');
+  const [education, setEducation] = useState('');
+  const [experience, setExperience] = useState('');
+  const [skills, setSkills] = useState('');
+  const [certifications, setCertifications] = useState('');
+  const [showProfessional, setShowProfessional] = useState(false);
+
+  const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const words = e.target.value.split(' ');
     const capitalized = words.map(word => {
       if (word.length === 0) return word;
@@ -25,7 +33,7 @@ export default function Hero() {
     setName(capitalized);
   };
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, '');
     if (val.startsWith('92')) val = val.substring(2);
     else if (val.startsWith('0')) val = val.substring(1);
@@ -41,7 +49,7 @@ export default function Hero() {
     setPhone(formatted);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cv' | 'pnc') => {
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>, type: 'cv' | 'pnc') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -59,17 +67,28 @@ export default function Hero() {
       });
       const data = await res.json();
       if (data.extractedData) {
-        if (data.extractedData.extractedName && !name) setName(data.extractedData.extractedName);
-        if (data.extractedData.extractedEmail && !email) setEmail(data.extractedData.extractedEmail);
-        if (data.extractedData.extractedLicense && !licenseNumber) setLicenseNumber(data.extractedData.extractedLicense);
-        if (data.extractedData.extractedPhone && !phone) {
-          let val = data.extractedData.extractedPhone.replace(/\D/g, '');
+        const ed = data.extractedData;
+        if (ed.extractedName && !name) setName(ed.extractedName);
+        if (ed.extractedEmail && !email) setEmail(ed.extractedEmail);
+        if (ed.extractedLicense && !licenseNumber) setLicenseNumber(ed.extractedLicense);
+        if (ed.extractedPhone && !phone) {
+          let val = ed.extractedPhone.replace(/\D/g, '');
           if (val.startsWith('92')) val = val.substring(2);
           else if (val.startsWith('0')) val = val.substring(1);
           let formatted = '+92';
           if (val.length > 0) formatted += ' ' + val.substring(0, 3);
           if (val.length > 3) formatted += ' ' + val.substring(3, 10);
           setPhone(formatted);
+        }
+        if (ed.extractedAddress && !address) setAddress(ed.extractedAddress);
+        if (ed.extractedLanguages && !languages) setLanguages(ed.extractedLanguages);
+        if (ed.extractedEducation && !education) setEducation(ed.extractedEducation);
+        if (ed.extractedExperience && !experience) setExperience(ed.extractedExperience);
+        if (ed.extractedSkills && !skills) setSkills(ed.extractedSkills);
+        if (ed.extractedCertifications && !certifications) setCertifications(ed.extractedCertifications);
+
+        if (ed.extractedEducation || ed.extractedExperience || ed.extractedSkills || ed.extractedCertifications) {
+          setShowProfessional(true);
         }
       }
     } catch (err) {
@@ -79,12 +98,19 @@ export default function Hero() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
+
+    formData.set('address', address);
+    formData.set('languages', languages);
+    formData.set('education', education);
+    formData.set('experience', experience);
+    formData.set('skills', skills);
+    formData.set('certifications', certifications);
 
     try {
       const response = await fetch('/api/apply', {
@@ -110,6 +136,13 @@ export default function Hero() {
       setLicenseName(null);
       setName('');
       setPhone('');
+      setAddress('');
+      setLanguages('');
+      setEducation('');
+      setExperience('');
+      setSkills('');
+      setCertifications('');
+      setShowProfessional(false);
     } catch (error) {
       console.error('Submission error:', error);
       alert('There was an error submitting your application. Please try again.');
@@ -213,15 +246,20 @@ export default function Hero() {
                   <h3 className="text-2xl font-serif text-white mb-2">Application Received!</h3>
                   <p className="text-slate-400 mb-6 text-sm">We've successfully processed your documents. <br/> A survey link has been generated based on your profile.</p>
                   
-                  {extractedData && Object.keys(extractedData).length > 0 && (
-                    <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-left mb-8">
+                    {extractedData && Object.keys(extractedData).length > 0 && (
+                    <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-4 text-left mb-8 max-h-96 overflow-y-auto">
                       <h4 className="text-[10px] text-brand-400 uppercase tracking-widest font-bold mb-3 border-b border-white/5 pb-2">AI Extracted Details</h4>
                       <ul className="space-y-2 text-sm text-slate-300">
                         {extractedData.extractedName && <li><strong className="text-slate-500">Name:</strong> {extractedData.extractedName}</li>}
                         {extractedData.extractedEmail && <li><strong className="text-slate-500">Email:</strong> {extractedData.extractedEmail}</li>}
                         {extractedData.extractedPhone && <li><strong className="text-slate-500">Phone:</strong> {extractedData.extractedPhone}</li>}
                         {extractedData.extractedLicense && <li><strong className="text-slate-500">License:</strong> {extractedData.extractedLicense}</li>}
-                        {extractedData.experience && <li><strong className="text-slate-500">Experience:</strong> {extractedData.experience}</li>}
+                        {extractedData.extractedAddress && <li><strong className="text-slate-500">Address:</strong> {extractedData.extractedAddress}</li>}
+                        {extractedData.extractedLanguages && <li><strong className="text-slate-500">Languages:</strong> {extractedData.extractedLanguages}</li>}
+                        {extractedData.extractedEducation && <li><strong className="text-slate-500">Education:</strong> {extractedData.extractedEducation}</li>}
+                        {extractedData.extractedExperience && <li><strong className="text-slate-500">Experience:</strong> {extractedData.extractedExperience}</li>}
+                        {extractedData.extractedSkills && <li><strong className="text-slate-500">Skills:</strong> {extractedData.extractedSkills}</li>}
+                        {extractedData.extractedCertifications && <li><strong className="text-slate-500">Certifications:</strong> {extractedData.extractedCertifications}</li>}
                       </ul>
                     </div>
                   )}
@@ -244,7 +282,7 @@ export default function Hero() {
               ) : (
                 <div>
                   <h3 className="text-2xl font-serif text-white mb-2">Instant Application</h3>
-                  <p className="text-sm text-slate-500 mb-8">Complete the fields below for an immediate interview invitation.</p>
+                  <p className="text-sm text-slate-500 mb-8">Upload your CV to auto-fill your details, or fill manually.</p>
 
                   <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
@@ -268,24 +306,88 @@ export default function Hero() {
                       <input name="licenseNumber" value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="PN-XXXXXXX" />
                     </div>
 
+                    {/* Professional Details (collapsible) */}
+                    <div className="border-t border-white/5 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowProfessional(!showProfessional)}
+                        className="flex items-center justify-between w-full text-left"
+                      >
+                        <span className="text-[10px] uppercase tracking-widest text-brand-400 font-bold flex items-center gap-2">
+                          <Briefcase size={14} />
+                          Professional Details
+                        </span>
+                        {showProfessional ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                      </button>
+
+                      {showProfessional && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          transition={{ duration: 0.3 }}
+                          className="space-y-4 mt-4"
+                        >
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2 flex items-center gap-1">
+                              <MapPin size={12} /> Address <span className="text-slate-600 font-normal lowercase tracking-normal">(optional)</span>
+                            </label>
+                            <input name="address" value={address} onChange={e => setAddress(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="City, Country" />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2 flex items-center gap-1">
+                              <Languages size={12} /> Languages <span className="text-slate-600 font-normal lowercase tracking-normal">(optional)</span>
+                            </label>
+                            <input name="languages" value={languages} onChange={e => setLanguages(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="English, Urdu, Sindhi..." />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2 flex items-center gap-1">
+                              <GraduationCap size={12} /> Education <span className="text-slate-600 font-normal lowercase tracking-normal">(optional)</span>
+                            </label>
+                            <input name="education" value={education} onChange={e => setEducation(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="BSN from University of..." />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2 flex items-center gap-1">
+                              <Briefcase size={12} /> Experience <span className="text-slate-600 font-normal lowercase tracking-normal">(optional)</span>
+                            </label>
+                            <input name="experience" value={experience} onChange={e => setExperience(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="5 years at Aga Khan Hospital..." />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2 flex items-center gap-1">
+                              <Wrench size={12} /> Skills <span className="text-slate-600 font-normal lowercase tracking-normal">(optional)</span>
+                            </label>
+                            <input name="skills" value={skills} onChange={e => setSkills(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="ICU, Paediatrics, Wound Care..." />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2 flex items-center gap-1">
+                              <BadgeCheck size={12} /> Certifications <span className="text-slate-600 font-normal lowercase tracking-normal">(optional)</span>
+                            </label>
+                            <input name="certifications" value={certifications} onChange={e => setCertifications(e.target.value)} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="BLS, ACLS, NRP..." />
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4 pt-2">
-                      {/* CV Upload */}
                       <div className="relative cursor-pointer group">
                         <input 
                           type="file" 
                           name="cv"
-                          accept=".pdf,.doc,.docx"
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
                           onChange={(e) => handleFileUpload(e, 'cv')}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                         />
                         <div className={`border-2 border-dashed rounded-xl p-3 flex flex-col items-center justify-center transition-colors h-24 ${cvName ? 'border-brand-500/50 bg-brand-500/10' : 'border-white/5 bg-white/0 group-hover:bg-white/5'}`}>
                           <FileText className={`w-5 h-5 mx-auto mb-1 ${cvName ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                          <p className="text-[10px] font-bold text-slate-400 truncate w-full text-center">{cvName || "Upload CV"}</p>
-                          <p className="text-[9px] text-slate-600 mt-1">{cvName ? "Ready" : "Optional"}</p>
+                          <p className="text-[10px] font-bold text-slate-400 truncate w-full text-center">{cvName || "Upload CV / Resume"}</p>
+                          <p className="text-[9px] text-slate-600 mt-1">{cvName ? "Ready" : "PDF, DOCX or Image"}</p>
                         </div>
                       </div>
 
-                      {/* PNC Upload */}
                       <div className="relative cursor-pointer group">
                         <input 
                           type="file" 
@@ -296,8 +398,8 @@ export default function Hero() {
                         />
                         <div className={`border-2 border-dashed rounded-xl p-3 flex flex-col items-center justify-center transition-colors h-24 ${licenseName ? 'border-brand-500/50 bg-brand-500/10' : 'border-white/5 bg-white/0 group-hover:bg-white/5'}`}>
                           <BadgeCheck className={`w-5 h-5 mx-auto mb-1 ${licenseName ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                          <p className="text-[10px] font-bold text-slate-400 truncate w-full text-center">{licenseName || "PNC File"}</p>
-                          <p className="text-[9px] text-slate-600 mt-1">{licenseName ? "Ready" : "Optional"}</p>
+                          <p className="text-[10px] font-bold text-slate-400 truncate w-full text-center">{licenseName || "PNC License"}</p>
+                          <p className="text-[9px] text-slate-600 mt-1">{licenseName ? "Ready" : "Photo or PDF"}</p>
                         </div>
                       </div>
                     </div>
