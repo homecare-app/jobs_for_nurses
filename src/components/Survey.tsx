@@ -9,6 +9,8 @@ export default function Survey() {
   const extractedData = location.state?.extractedData || {};
 
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -30,7 +32,128 @@ export default function Survey() {
     setProgress(pct);
   };
 
-  const handleSubmit = () => {
+  // Helper: get field value by label text (handles text/date/tel/email/select/textarea)
+  function getFieldValue(labelText: string): string {
+    const labels = document.querySelectorAll('label');
+    for (const label of labels) {
+      const text = (label.textContent?.trim() || '').replace(/\s*\*$/, '');
+      if (text === labelText) {
+        const field = label.closest('.field');
+        if (field) {
+          const input = field.querySelector('input:not([type="radio"]):not([type="checkbox"]), select, textarea') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+          if (input) return input.value;
+        }
+        const next = label.nextElementSibling as HTMLInputElement | HTMLSelectElement | null;
+        if (next) return next.value;
+      }
+    }
+    return '';
+  }
+
+  // Helper: get checked radio value by name
+  function getRadioValue(name: string): string {
+    const checked = document.querySelector(`input[name="${name}"]:checked`) as HTMLInputElement;
+    return checked?.value ?? '';
+  }
+
+  // Helper: get checked checkbox label texts within a container
+  function getCheckedLabels(containerSelector: string): string[] {
+    return Array.from(document.querySelectorAll(containerSelector))
+      .filter((el) => (el as HTMLInputElement).checked)
+      .map((el) => {
+        const label = el.closest('.check-item')?.querySelector('.check-label');
+        return label?.textContent?.trim() ?? (el as HTMLInputElement).value;
+      });
+  }
+
+  // Helper: get selected tag button texts
+  function getSelectedTags(containerId: string): string[] {
+    return Array.from(document.querySelectorAll(`#${containerId} .tag-btn.selected`))
+      .map((el) => el.textContent?.trim() ?? '');
+  }
+
+  // Helper: get active scale button value
+  function getScaleValue(scaleId: string): string {
+    const active = document.querySelector(`#${scaleId} .scale-btn.active`);
+    return active?.textContent?.trim() ?? '';
+  }
+
+  // Collect all survey form data from the DOM
+  function collectSurveyData(): Record<string, unknown> {
+    const sections = document.querySelectorAll('.section');
+
+    // --- Section 1: Personal info ---
+    const personal = {
+      fullName: getFieldValue('Full name'),
+      gender: getFieldValue('Gender'),
+      dateOfBirth: getFieldValue('Date of birth'),
+      cnicNumber: getFieldValue('CNIC number'),
+      mobileNumber: getFieldValue('Mobile number'),
+      whatsappNumber: getFieldValue('WhatsApp number'),
+      email: getFieldValue('Email address'),
+      city: getFieldValue('City of residence'),
+      area: getFieldValue('Area / neighbourhood'),
+      transport: getFieldValue('Do you own a vehicle or have reliable transport'),
+    };
+
+    // --- Section 2: Professional ---
+    const professional = {
+      pncLicense: getFieldValue('PNC license number'),
+      licenseExpiry: getFieldValue('PNC license expiry date'),
+      qualification: getFieldValue('Professional qualification'),
+      specializations: getSelectedTags('specTags'),
+      yearsExperience: getFieldValue('Total years of experience'),
+      homeNursingExperience: getFieldValue('Experience in home nursing'),
+      institutionName: sections[1]?.querySelector('input[type="text"]:last-of-type') ? (sections[1].querySelector('input[type="text"]:last-of-type') as HTMLInputElement).value : '',
+    };
+
+    // --- Section 3: Employment ---
+    const employment = {
+      employmentStatus: getRadioValue('emp'),
+      monthlyIncome: Array.from(sections[2]?.querySelectorAll('select') ?? [])[0] ? (Array.from(sections[2].querySelectorAll('select'))[0] as HTMLSelectElement).value : '',
+      supplementalIncome: getRadioValue('supp'),
+      supplementalIncomeAmount: Array.from(sections[2]?.querySelectorAll('select') ?? [])[1] ? (Array.from(sections[2].querySelectorAll('select'))[1] as HTMLSelectElement).value : '',
+      expectedPay: getFieldValue('If offered fair pay, how much would you expect per shift for home nursing'),
+    };
+
+    // --- Section 4: Availability ---
+    const availability = {
+      availabilityHours: getFieldValue('How many hours per week are you available for home nursing work'),
+      shifts: getCheckedLabels('.section:nth-of-type(4) .check-group input[type="checkbox"]'),
+      travelDistance: getFieldValue('Are you willing to travel to patient homes outside your immediate area'),
+      transitionConsideration: getRadioValue('transition'),
+      preferredPatientTypes: getCheckedLabels('.section:nth-of-type(4) .two-col input[type="checkbox"]'),
+    };
+
+    // --- Section 5: Safety ---
+    const safety = {
+      comfortAlone: getScaleValue('scale1'),
+      challenges: getCheckedLabels('.section:nth-of-type(5) .check-group input[type="checkbox"]'),
+      fears: getCheckedLabels('.section:nth-of-type(5) .field:nth-of-type(3) .check-group input[type="checkbox"]'),
+      platformSafety: getRadioValue('safer'),
+      specificConcern: sections[4]?.querySelector('textarea') ? (sections[4].querySelector('textarea') as HTMLTextAreaElement).value : '',
+    };
+
+    // --- Section 6: App viability ---
+    const viability = {
+      platformAwareness: getRadioValue('aware'),
+      findingWork: getCheckedLabels('.section:nth-of-type(6) .check-group input[type="checkbox"]'),
+      viabilityRating: getScaleValue('scale2'),
+      importantFeatures: getCheckedLabels('.section:nth-of-type(6) .field:nth-of-type(4) .check-group input[type="checkbox"]'),
+      recommendationRating: getScaleValue('scale3'),
+      biggestBarrier: sections[5]?.querySelector('textarea:last-of-type') ? (sections[5].querySelector('textarea:last-of-type') as HTMLTextAreaElement).value : '',
+    };
+
+    // --- Section 7: Final remarks ---
+    const final = {
+      additionalComments: sections[6]?.querySelector('textarea') ? (sections[6].querySelector('textarea') as HTMLTextAreaElement).value : '',
+      followUp: getRadioValue('followup'),
+    };
+
+    return { ...personal, ...professional, ...employment, ...availability, ...safety, ...viability, ...final };
+  }
+
+  const handleSubmit = async () => {
     const consent = document.getElementById('consentCheck') as HTMLInputElement;
     if (!consent?.checked) {
       if (consent?.parentElement) {
@@ -39,7 +162,34 @@ export default function Survey() {
       }
       return;
     }
-    setIsSubmitted(true);
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const surveyData = collectSurveyData();
+      const response = await fetch('/api/survey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ surveyData, extractedData }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit survey');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error('Survey submission was not accepted');
+      }
+
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error('Survey submission error:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleTag = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -533,7 +683,18 @@ export default function Survey() {
         </div>
 
         <div className="submit-area pb-10">
-          <button type="button" className="submit-btn" onClick={handleSubmit}>Submit survey</button>
+          {submitError && (
+            <div className="text-red-500 text-sm mb-4 text-center">{submitError}</div>
+          )}
+          <button
+            type="button"
+            className="submit-btn"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit survey'}
+          </button>
         </div>
 
       </div>
