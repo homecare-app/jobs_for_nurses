@@ -291,9 +291,8 @@ export function parseCvText(rawText: string): ExtractedCvData {
   // --- Certifications ---
   const certSection = extractSection(rawText, [
     /certificat/i,
-    /licens/i,
-    /credential/i,
     /professional\s+membership/i,
+    /credential/i,
   ]);
   if (certSection) {
     const certLines = certSection

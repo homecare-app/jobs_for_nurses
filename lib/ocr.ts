@@ -26,17 +26,13 @@ export async function extractTextFromImage(buffer: Buffer): Promise<string> {
     buffer.byteOffset,
     buffer.byteOffset + buffer.byteLength
   ) as ArrayBuffer;
-  const result = await service.recognize(arrayBuf, { flatten: true });
+  // result is always FlattenedPaddleOcrResult when flatten:true
+  const result = await service.recognize(arrayBuf, { flatten: true }) as { results: Array<{ text: string }> };
 
-  // `result` is FlattenedPaddleOcrResult when flatten:true
-  if ("results" in result) {
-    return result.results
-      .map((r) => r.text.trim())
-      .filter(Boolean)
-      .join("\n");
-  }
-  // Fallback: grouped result
-  return result.text;
+  return result.results
+    .map((r) => r.text.trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

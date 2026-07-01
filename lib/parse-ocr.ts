@@ -33,7 +33,7 @@ export function parseOcrText(rawText: string): ExtractedData {
 
   // --- Phone (Pakistani: +92 3XX XXXXXXX or variants) ---
   const phoneRegex =
-    /(?:\+?92[\s-]?|0)(?:3\d{2})[\s-]?\d{1}[\s-]?\d{4}[\s-]?\d{4}|\+?92[\s-]?\d{10}|\b0\d{10}\b|\+92\s\d{3}\s\d{7,8}/;
+    /(?:\+?92[\s-]?|0)(?:3\d{2})[\s-]?\d{1}[\s-]?\d{3}[\s-]?\d{3}|\+?92[\s-]?\d{10}|\b0\d{10}\b|\+92\s\d{3}\s\d{7,8}/;
   for (const line of lines) {
     const cleaned = line.replace(/[-\s]/g, "");
     // Try to find Pakistani mobile numbers

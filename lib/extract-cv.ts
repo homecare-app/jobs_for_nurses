@@ -6,7 +6,7 @@ async function getPdfParse() {
   if (!pdfParseModule) {
     pdfParseModule = await import("pdf-parse");
   }
-  return pdfParseModule.default || pdfParseModule;
+  return pdfParseModule;
 }
 
 let mammothModule: any = null;
@@ -97,9 +97,16 @@ export async function extractTextFromCv(
 }
 
 async function extractPdfText(buffer: Buffer): Promise<{ text: string; sourceType: string }> {
-  const pdfParse = await getPdfParse();
-  const data = await pdfParse(buffer);
-  return { text: data.text || "", sourceType: "pdf" };
+  const mod = await getPdfParse();
+  const { PDFParse, VerbosityLevel } = mod;
+  const parser = new PDFParse({
+    verbosity: VerbosityLevel.ERRORS,
+    data: new Uint8Array(buffer),
+  });
+  const result = await parser.getText();
+  const text = result.text || "";
+  parser.destroy();
+  return { text, sourceType: "pdf" };
 }
 
 async function extractDocxText(buffer: Buffer): Promise<{ text: string; sourceType: string }> {
