@@ -25,7 +25,7 @@ function LandingPage() {
 
 export default function App() {
   return (
-    <Router>
+    <Router basename="/jobs_for_nurses">
       <div className="min-h-screen bg-[#080a0f] text-slate-300 font-sans selection:bg-brand-500/30 selection:text-brand-400">
         <Routes>
           <Route path="/" element={<LandingPage />} />
