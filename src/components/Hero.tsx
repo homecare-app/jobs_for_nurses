@@ -152,7 +152,7 @@ export default function Hero() {
   };
 
   return (
-    <section id="apply-form" className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden bg-[#080a0f] min-h-screen flex items-center">
+    <section id="apply-form" className="relative pt-24 sm:pt-32 pb-16 sm:pb-20 lg:pt-40 lg:pb-32 overflow-hidden bg-[#080a0f] min-h-screen flex items-center">
       {/* Background decoration */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-5%] left-[-5%] w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
@@ -172,16 +172,16 @@ export default function Hero() {
               <span>Hiring Nurses for 10+ Countries</span>
             </div>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-serif font-light text-white leading-tight mb-6">
+            <h1 className="text-3xl sm:text-5xl lg:text-7xl font-serif font-light text-white leading-tight mb-6">
               Your Nursing Career, <br/>
               <span className="italic font-normal text-white">Across Borders.</span>
             </h1>
             
-            <p className="text-lg text-slate-400 mb-8 leading-relaxed max-w-lg">
+            <p className="text-base sm:text-lg text-slate-400 mb-8 leading-relaxed max-w-lg">
               We are actively hiring qualified nurses for premier medical facilities worldwide. Upload your CV and PNC License below for an immediate interview schedule.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8 text-3xl">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-8 text-2xl sm:text-3xl">
               <span title="United States">🇺🇸</span>
               <span title="United Kingdom">🇬🇧</span>
               <span title="Canada">🇨🇦</span>
@@ -195,10 +195,10 @@ export default function Hero() {
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-2 flex items-center h-full pt-1">+ More</span>
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-10">
-              <img src="https://images.unsplash.com/photo-1584432810601-6c7f27d2362b?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-32 sm:h-40 rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse working" />
-              <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb3?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-32 sm:h-40 rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse with patient" />
-              <img src="https://images.unsplash.com/photo-1581056771107-24ca5f463cd5?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-32 sm:h-40 rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer hidden sm:block" alt="Nurse team" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-10">
+              <img src="https://images.unsplash.com/photo-1584432810601-6c7f27d2362b?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-24 sm:h-32 lg:h-40 rounded-xl sm:rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse working" />
+              <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb3?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-24 sm:h-32 lg:h-40 rounded-xl sm:rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse with patient" />
+              <img src="https://images.unsplash.com/photo-1581056771107-24ca5f463cd5?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-24 sm:h-32 lg:h-40 rounded-xl sm:rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer hidden sm:block" alt="Nurse team" />
             </div>
 
             <div className="bg-brand-500/10 border border-brand-500/20 rounded-2xl p-6 mb-10 max-w-lg">
@@ -233,7 +233,7 @@ export default function Hero() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="lg:col-span-5 w-full"
           >
-            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl">
+            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl">
               {isSuccess ? (
                 <div className="text-center py-8">
                   <motion.div 
@@ -290,7 +290,7 @@ export default function Hero() {
                       <input required name="fullName" value={name} onChange={handleNameChange} type="text" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="John Doe" />
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold block mb-2">Phone</label>
                         <input required name="phone" value={phone} onChange={handlePhoneChange} type="tel" className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-600" placeholder="+92 3XX XXXXXXX" />
@@ -372,7 +372,7 @@ export default function Hero() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2">
                       <div className="relative cursor-pointer group">
                         <input 
                           type="file" 

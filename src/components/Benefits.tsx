@@ -45,7 +45,7 @@ export default function Benefits() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-5xl font-serif text-white mb-6"
+            className="text-3xl md:text-5xl font-serif text-white mb-6 leading-tight"
           >
             Elevate Your Practice
           </motion.h2>
@@ -68,9 +68,9 @@ export default function Benefits() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300 group"
+              className="bg-white/[0.02] border border-white/5 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300 group"
             >
-              <div className="w-12 h-12 bg-white/[0.05] border border-white/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/[0.05] border border-white/10 rounded-xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
                 {benefit.icon}
               </div>
               <h3 className="text-xl font-serif text-white mb-3">{benefit.title}</h3>
