@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
@@ -8,11 +8,26 @@ import { parseOcrText } from "./lib/parse-ocr.js";
 import { extractTextFromCv } from "./lib/extract-cv.js";
 import { parseCvText } from "./lib/parse-cv.js";
 
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'image/png',
+  'image/jpeg',
+] as const;
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit per file (OCR needs room)
-  }
+  },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype as typeof ALLOWED_MIME_TYPES[number])) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${file.mimetype}. Allowed: PDF, DOCX, PNG, JPEG`));
+    }
+  },
 });
 
 async function startServer() {
@@ -23,7 +38,7 @@ async function startServer() {
   app.use(express.json());
 
   // API routes FIRST
-  app.post("/api/extract", upload.single('file'), async (req: any, res: any) => {
+  app.post("/api/extract", upload.single('file'), async (req: Request, res: Response) => {
     try {
       const file = req.file;
       if (!file) {
@@ -35,13 +50,13 @@ async function startServer() {
       const cvData = parseCvText(text);
       const mergedData = { ...ocrData, ...cvData };
       res.json({ extractedData: mergedData });
-    } catch (error: any) {
+    } catch (error) {
       console.warn("Extraction error (handled):", error);
       res.json({ extractedData: {} });
     }
   });
 
-  app.post("/api/apply", upload.fields([{ name: 'cv', maxCount: 1 }, { name: 'pnc', maxCount: 1 }]), async (req: any, res: any) => {
+  app.post("/api/apply", upload.fields([{ name: 'cv', maxCount: 1 }, { name: 'pnc', maxCount: 1 }]), async (req: Request, res: Response) => {
     try {
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -76,9 +91,13 @@ async function startServer() {
       const finalEmail = email || extractedData.extractedEmail;
       const finalLicense = licenseNumber || extractedData.extractedLicense;
 
-      if (!supabaseUrl || !supabaseServiceKey) {
-        console.warn("Supabase credentials not configured.");
-        return res.json({ success: true, simulated: true, extractedData, message: "Application received. (Simulated)" });
+      if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
+        console.warn("Supabase URL not configured or invalid.");
+        return res.json({ success: true, simulated: true, extractedData, message: "Application received. (Simulated — Supabase not configured)" });
+      }
+      if (!supabaseServiceKey || supabaseServiceKey.length < 10 || /^your_|^MY_/i.test(supabaseServiceKey)) {
+        console.warn("Supabase service role key not configured or invalid.");
+        return res.json({ success: true, simulated: true, extractedData, message: "Application received. (Simulated — Supabase not configured)" });
       }
 
       let dbData = null;
@@ -105,9 +124,46 @@ async function startServer() {
       }
 
       res.json({ success: true, data: dbData, extractedData, message: "Application received and survey link generated." });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Application error:", error);
-      res.status(500).json({ error: error.message || "Failed to submit application" });
+      const message = error instanceof Error ? error.message : "Failed to submit application";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Survey submission endpoint
+  app.post("/api/survey", async (req: Request, res: Response) => {
+    try {
+      const surveyData = req.body?.surveyData || {};
+      const extracted = req.body?.extractedData || {};
+
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
+        console.warn("Supabase not configured — survey simulated.");
+        return res.json({ success: true, simulated: true });
+      }
+      if (!supabaseServiceKey || supabaseServiceKey.length < 10 || /^your_|^MY_/i.test(supabaseServiceKey)) {
+        console.warn("Supabase not configured — survey simulated.");
+        return res.json({ success: true, simulated: true });
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const { error: insertError } = await supabase
+        .from("survey_responses")
+        .insert([{ survey_data: surveyData, extracted_data: extracted, submitted_at: new Date().toISOString() }]);
+
+      if (insertError) {
+        console.warn("Survey insert error (handled):", insertError);
+        return res.json({ success: true, simulated: true });
+      }
+
+      res.json({ success: true, id: null });
+    } catch (error) {
+      console.error("Survey submission error:", error);
+      const message = error instanceof Error ? error.message : "Failed to submit survey";
+      res.status(500).json({ error: message });
     }
   });
 
@@ -127,7 +183,7 @@ async function startServer() {
   }
 
   // Global error handler
-  app.use((err: any, req: any, res: any, next: any) => {
+  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     console.error("Global error:", err);
     res.status(500).json({ error: err.message || "Internal Server Error" });
   });
