@@ -14,7 +14,7 @@ const corsHeaders = {
 function extractViaRegex(text: string): Record<string, string> {
   const data: Record<string, string> = {};
 
-  const nameMatch = text.match(/(?:Name|name|Candidate|Nurse|Dr\.)\s*:\s*([A-Za-z\s.]+)/);
+  const nameMatch = text.match(/(?:Name|name|Candidate|Nurse|Dr\.)\s*:\s*([A-Za-z .'-]+)/);
   if (nameMatch) data.extractedName = nameMatch[1].trim();
   else {
     const drMatch = text.match(/(Dr\.\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
@@ -40,7 +40,7 @@ function extractViaRegex(text: string): Record<string, string> {
     if (anyPhone) data.extractedPhone = anyPhone[1].trim();
   }
 
-  const pncMatch = text.match(/(?:PNC|Pnc|pnc)[\s-]*(\d{4,10})/);
+  const pncMatch = text.match(/(?:PNC|Pnc|pnc)[:\s-]*(\d{4,10})/);
   if (pncMatch) data.extractedLicense = "PNC-" + pncMatch[1];
   else {
     const licMatch = text.match(/(?:License|Licence|license|licence)\s*:\s*([A-Za-z0-9-]+)/i);
@@ -68,11 +68,8 @@ function extractViaRegex(text: string): Record<string, string> {
   return data;
 }
 
-function fileToBase64(file: File): string {
-  const bytes = new Uint8Array(file.size);
-  // Read file into Uint8Array via FileReader-compatible approach in Deno
-  const reader = new FileReaderSync();
-  const buffer = reader.readAsArrayBuffer(file);
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
   const uint8 = new Uint8Array(buffer);
   let binary = "";
   for (let i = 0; i < uint8.length; i++) {
@@ -120,10 +117,10 @@ async function callGemini(file: File): Promise<Record<string, string> | null> {
     const text = await file.text();
     parts = [{ text: GEMINI_INSTRUCTION + "\n\nDocument content:\n" + text }];
   } else if (isImage(mimeType) || isPdf(mimeType)) {
-    const base64 = fileToBase64(file);
+    const base64 = await fileToBase64(file);
     parts = [
       { text: GEMINI_INSTRUCTION },
-      { inline_data: { mime_type: mimeType, data: base64 } },
+      { inlineData: { mimeType, data: base64 } },
     ];
   } else {
     return null;

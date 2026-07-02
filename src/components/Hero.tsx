@@ -28,7 +28,7 @@ export default function Hero() {
   // Parse text content client-side to extract fields
   const extractFromText = (text: string) => {
     const result: Record<string, string> = {};
-    const mName = text.match(/(?:Name|name|Candidate|Nurse|Dr\.)\s*:\s*([A-Za-z\s.]+)/);
+    const mName = text.match(/(?:Name|name|Candidate|Nurse|Dr\.)\s*:\s*([A-Za-z .'-]+)/);
     if (mName) result.extractedName = mName[1].trim();
     else {
       const dr = text.match(/(Dr\.\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
@@ -48,7 +48,7 @@ export default function Hero() {
         result.extractedPhone = p;
       }
     }
-    const mPnc = text.match(/(?:PNC|Pnc|pnc)[\s-]*(\d{4,10})/);
+    const mPnc = text.match(/(?:PNC|Pnc|pnc)[:\s-]*(\d{4,10})/);
     if (mPnc) result.extractedLicense = 'PNC-' + mPnc[1];
     else {
       const mLic = text.match(/(?:License|Licence|license|licence)\s*:\s*([A-Za-z0-9-]+)/i);
