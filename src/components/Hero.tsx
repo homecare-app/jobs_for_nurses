@@ -170,10 +170,13 @@ export default function Hero() {
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-2 flex items-center h-full pt-1">+ More</span>
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-10">
-              <img src="https://images.unsplash.com/photo-1584432810601-6c7f27d2362b?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-24 sm:h-32 lg:h-40 rounded-xl sm:rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse working" />
-              <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb3?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-24 sm:h-32 lg:h-40 rounded-xl sm:rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse with patient" />
-              <img src="https://images.unsplash.com/photo-1581056771107-24ca5f463cd5?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-24 sm:h-32 lg:h-40 rounded-xl sm:rounded-2xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer hidden sm:block" alt="Nurse team" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-10">
+              <img src="https://images.unsplash.com/photo-1584432810601-6c7f27d2362b?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-20 sm:h-28 lg:h-32 rounded-lg sm:rounded-xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse working" />
+              <img src="https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-20 sm:h-28 lg:h-32 rounded-lg sm:rounded-xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Healthcare team" />
+              <img src="https://images.unsplash.com/photo-1464037866556-6812c9d1c72e?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-20 sm:h-28 lg:h-32 rounded-lg sm:rounded-xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer hidden sm:block" alt="Airplane wing" />
+              <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-20 sm:h-28 lg:h-32 rounded-lg sm:rounded-xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Airport terminal" />
+              <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb3?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-20 sm:h-28 lg:h-32 rounded-lg sm:rounded-xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse with patient" />
+              <img src="https://images.unsplash.com/photo-1581056771107-24ca5f463cd5?auto=format&fit=crop&q=80&w=600&h=400" className="w-full h-20 sm:h-28 lg:h-32 rounded-lg sm:rounded-xl border border-white/10 object-cover grayscale opacity-80 hover:grayscale-0 transition-all duration-500 cursor-pointer" alt="Nurse team" />
             </div>
 
             <div className="bg-brand-500/10 border border-brand-500/20 rounded-2xl p-6 mb-10 max-w-lg">
@@ -190,10 +193,13 @@ export default function Hero() {
 
             {/* Nurses Image Row */}
             <div className="flex items-center gap-4">
-              <div className="flex -space-x-4">
-                <img src="https://images.unsplash.com/photo-1584432810601-6c7f27d2362b?auto=format&fit=crop&q=80&w=100&h=100" className="w-12 h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80" alt="Nurse" />
-                <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb3?auto=format&fit=crop&q=80&w=100&h=100" className="w-12 h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80" alt="Nurse" />
-                <img src="https://images.unsplash.com/photo-1581056771107-24ca5f463cd5?auto=format&fit=crop&q=80&w=100&h=100" className="w-12 h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80" alt="Nurse" />
+              <div className="flex -space-x-3 sm:-space-x-4">
+                <img src="https://images.unsplash.com/photo-1584432810601-6c7f27d2362b?auto=format&fit=crop&q=80&w=100&h=100" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80" alt="Nurse" />
+                <img src="https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=100&h=100" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80 hidden sm:block" alt="Healthcare team" />
+                <img src="https://images.unsplash.com/photo-1464037866556-6812c9d1c72e?auto=format&fit=crop&q=80&w=100&h=100" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80" alt="Travel" />
+                <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&q=80&w=100&h=100" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80 hidden sm:block" alt="Airport" />
+                <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb3?auto=format&fit=crop&q=80&w=100&h=100" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80" alt="Nurse" />
+                <img src="https://images.unsplash.com/photo-1581056771107-24ca5f463cd5?auto=format&fit=crop&q=80&w=100&h=100" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-[#080a0f] object-cover grayscale opacity-80 hidden sm:block" alt="Nurse team" />
               </div>
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">
                 Join 5,000+ Nurses<br/>Placed Globally
