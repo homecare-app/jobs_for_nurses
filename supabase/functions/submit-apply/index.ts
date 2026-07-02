@@ -1,7 +1,3 @@
-// Edge Function: submit-apply
-// Accepts FormData with application fields + CV/PNC files
-// Stores files in Supabase Storage, inserts record in nursing_applications
-
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 Deno.serve(async (req: Request) => {
@@ -12,7 +8,6 @@ Deno.serve(async (req: Request) => {
     "Access-Control-Allow-Headers": "Content-Type, apikey, Authorization",
   };
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,7 +15,6 @@ Deno.serve(async (req: Request) => {
   try {
     const formData = await req.formData();
 
-    // Extract text fields
     const fields = {
       fullName: formData.get("fullName")?.toString() || "",
       phone: formData.get("phone")?.toString() || "",
@@ -34,53 +28,11 @@ Deno.serve(async (req: Request) => {
       certifications: formData.get("certifications")?.toString() || "",
     };
 
-    // Extract files
-    const cvFile = formData.get("cv") as File | null;
-    const pncFile = formData.get("pnc") as File | null;
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Create storage bucket if it doesn't exist
-    const { data: buckets } = await supabase.storage.listBuckets();
-    if (!buckets?.find((b: { name: string }) => b.name === "applications")) {
-      await supabase.storage.createBucket("applications", {
-        public: false,
-      });
-    }
-
-    // Upload files to storage
-    const uploadedFiles: Array<{ name: string; path: string; type: string }> = [];
-
-    if (cvFile && cvFile.size > 0) {
-      const cvBytes = await cvFile.arrayBuffer();
-      const cvPath = `${Date.now()}-cv-${cvFile.name}`;
-      const { error: cvErr } = await supabase.storage
-        .from("applications")
-        .upload(cvPath, cvBytes, {
-          contentType: cvFile.type || "application/octet-stream",
-        });
-      if (!cvErr) {
-        uploadedFiles.push({ name: cvFile.name, path: cvPath, type: "cv" });
-      }
-    }
-
-    if (pncFile && pncFile.size > 0) {
-      const pncBytes = await pncFile.arrayBuffer();
-      const pncPath = `${Date.now()}-pnc-${pncFile.name}`;
-      const { error: pncErr } = await supabase.storage
-        .from("applications")
-        .upload(pncPath, pncBytes, {
-          contentType: pncFile.type || "application/octet-stream",
-        });
-      if (!pncErr) {
-        uploadedFiles.push({ name: pncFile.name, path: pncPath, type: "pnc" });
-      }
-    }
-
-    // Insert application record
     const { data, error } = await supabase
       .from("nursing_applications")
       .insert({
@@ -95,7 +47,6 @@ Deno.serve(async (req: Request) => {
           experience: fields.experience || null,
           skills: fields.skills || null,
           certifications: fields.certifications || null,
-          uploaded_files: uploadedFiles.length > 0 ? uploadedFiles : null,
         },
         survey_link_sent: true,
       })
