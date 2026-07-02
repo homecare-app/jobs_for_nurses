@@ -23,6 +23,7 @@ export default function Hero() {
   const [experience, setExperience] = useState('');
   const [skills, setSkills] = useState('');
   const [certifications, setCertifications] = useState('');
+  const [extractionError, setExtractionError] = useState<string | null>(null);
 
   // Parse text content client-side to extract fields
   const extractFromText = (text: string) => {
@@ -98,8 +99,8 @@ export default function Hero() {
     if (type === 'pnc') setLicenseName(file.name);
 
     setIsExtracting(true);
+    setExtractionError(null);
 
-    // Client-side text extraction (works immediately, no edge function deploy needed)
     const fileName = file.name.toLowerCase();
     const textExt = ['.txt', '.csv', '.json', '.md'];
     const isTextFile = textExt.some(ext => fileName.endsWith(ext));
@@ -120,13 +121,22 @@ export default function Hero() {
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      const data = await callEdgeFunction<{ extractedData: Record<string, string> }>('extract-info', formData);
-      if (data.extractedData) {
+      formData.append(type, file);
+      const data = await callEdgeFunction<{
+        extractedData: Record<string, string>;
+        warnings?: string[];
+        error?: string;
+      }>('extract-info', formData);
+      if (data.extractedData && Object.keys(data.extractedData).length > 0) {
         applyExtracted(data.extractedData);
+      } else if (data.error) {
+        setExtractionError(data.error);
+      } else {
+        setExtractionError("Could not extract data from this file. Please fill the fields manually.");
       }
     } catch (err) {
       console.error("Extraction error:", err);
+      setExtractionError("Failed to process file. Please fill the fields manually.");
     } finally {
       setIsExtracting(false);
     }
@@ -183,6 +193,7 @@ export default function Hero() {
         applicationId: appId,
       };
       setExtractedData(merged);
+      sessionStorage.setItem('extractedData', JSON.stringify(merged));
       form.reset();
       setCvName(null);
       setLicenseName(null);
@@ -377,6 +388,12 @@ export default function Hero() {
                         </div>
                       </div>
                     </div>
+
+                    {extractionError && (
+                      <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                        {extractionError}
+                      </div>
+                    )}
 
                     <button 
                       type="submit" 

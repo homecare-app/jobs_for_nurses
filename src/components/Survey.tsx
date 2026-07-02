@@ -5,9 +5,50 @@ import { CheckCircle2 } from 'lucide-react';
 import './Survey.css';
 import { supabase } from '../lib/supabase';
 
+const CITIES = ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Peshawar', 'Quetta', 'Other'];
+
+function detectCity(address: string): string {
+  if (!address) return '';
+  const lower = address.toLowerCase();
+  for (const city of CITIES) {
+    if (city === 'Other') continue;
+    if (lower.includes(city.toLowerCase())) return city;
+  }
+  return '';
+}
+
+function matchEducation(edu: string): string {
+  if (!edu) return '';
+  const eduMap: Record<string, string[]> = {
+    'Diploma in General Nursing (DGN)': ['dgn', 'diploma general nursing', 'diploma in general'],
+    'Bachelor of Science in Nursing (BSN)': ['bsn', 'bachelor', 'b.sc', 'bachelor of science'],
+    'Post-RN BSN': ['post-rn', 'post rn'],
+    'Master of Science in Nursing (MSN)': ['msn', 'master', 'm.sc', 'master of science'],
+    'Lady Health Visitor (LHV)': ['lhv', 'lady health'],
+    'Nurse Aide / Auxiliary Nurse': ['aide', 'auxiliary', 'nurse aide'],
+  };
+  const lower = edu.toLowerCase();
+  for (const [option, keywords] of Object.entries(eduMap)) {
+    if (keywords.some(k => lower.includes(k))) return option;
+  }
+  return '';
+}
+
 export default function Survey() {
   const location = useLocation();
-  const extractedData = location.state?.extractedData || {};
+  const stateData = location.state?.extractedData || {};
+  const [storedData] = useState(() => {
+    if (stateData && Object.keys(stateData).length > 0) return stateData;
+    try {
+      const stored = sessionStorage.getItem('extractedData');
+      if (stored) return JSON.parse(stored);
+    } catch { /* ignore */ }
+    return {};
+  });
+  const extractedData = storedData;
+
+  const detectedCity = detectCity(extractedData.extractedAddress || '');
+  const matchedEducation = matchEducation(extractedData.extractedEducation || '');
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -289,15 +330,9 @@ export default function Survey() {
             <div className="field-row">
               <div className="field">
                 <label>City of residence <span className="req">*</span></label>
-                <select onChange={updateProgress}>
+                <select defaultValue={detectedCity} onChange={updateProgress}>
                   <option value="">Select city</option>
-                  <option>Karachi</option>
-                  <option>Lahore</option>
-                  <option>Islamabad</option>
-                  <option>Rawalpindi</option>
-                  <option>Peshawar</option>
-                  <option>Quetta</option>
-                  <option>Other</option>
+                  {CITIES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="field">
@@ -337,16 +372,16 @@ export default function Survey() {
             </div>
             <div className="field">
               <label>Professional qualification <span className="req">*</span></label>
-              <select defaultValue={extractedData.extractedEducation || ''} onChange={updateProgress}>
-                <option value="">Select highest qualification</option>
-                <option>Diploma in General Nursing (DGN)</option>
-                <option>Bachelor of Science in Nursing (BSN)</option>
-                <option>Post-RN BSN</option>
-                <option>Master of Science in Nursing (MSN)</option>
-                <option>Lady Health Visitor (LHV)</option>
-                <option>Nurse Aide / Auxiliary Nurse</option>
-                <option>Other</option>
-              </select>
+                <select defaultValue={matchedEducation || extractedData.extractedEducation || ''} onChange={updateProgress}>
+                  <option value="">Select highest qualification</option>
+                  <option>Diploma in General Nursing (DGN)</option>
+                  <option>Bachelor of Science in Nursing (BSN)</option>
+                  <option>Post-RN BSN</option>
+                  <option>Master of Science in Nursing (MSN)</option>
+                  <option>Lady Health Visitor (LHV)</option>
+                  <option>Nurse Aide / Auxiliary Nurse</option>
+                  <option>Other</option>
+                </select>
             </div>
             <div className="field">
               <label>Specialisation / clinical area</label>
