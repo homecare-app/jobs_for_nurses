@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ShieldCheck, FileText, BadgeCheck, UploadCloud, CheckCircle2, Globe2 } from 'lucide-react';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 export default function Hero() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -35,7 +37,7 @@ export default function Hero() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/extract', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-info`, {
         method: 'POST',
         body: formData
       });
@@ -89,7 +91,7 @@ export default function Hero() {
     formData.set('certifications', certifications);
 
     try {
-      const response = await fetch('/api/apply', {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/submit-apply`, {
         method: 'POST',
         body: formData, // Send the FormData directly
       });
@@ -106,12 +108,27 @@ export default function Hero() {
       const resData = await response.json();
 
       setIsSuccess(true);
-      setExtractedData(resData?.extractedData || null);
+      // Merge API extracted data with user-typed form data
+      const apiExtracted = resData?.extractedData || {};
+      setExtractedData({
+        extractedName: name || apiExtracted.extractedName,
+        extractedEmail: email || apiExtracted.extractedEmail,
+        extractedPhone: phone || apiExtracted.extractedPhone,
+        extractedLicense: licenseNumber || apiExtracted.extractedLicense,
+        extractedAddress: address || apiExtracted.extractedAddress,
+        extractedLanguages: languages || apiExtracted.extractedLanguages,
+        extractedEducation: education || apiExtracted.extractedEducation,
+        extractedExperience: experience || apiExtracted.extractedExperience,
+        extractedSkills: skills || apiExtracted.extractedSkills,
+        extractedCertifications: certifications || apiExtracted.extractedCertifications,
+      });
       form.reset();
       setCvName(null);
       setLicenseName(null);
       setName('');
+      setEmail('');
       setPhone('');
+      setLicenseNumber('');
       setAddress('');
       setLanguages('');
       setEducation('');
@@ -224,7 +241,9 @@ export default function Hero() {
                   >
                     <CheckCircle2 className="w-10 h-10 text-brand-400" />
                   </motion.div>
-                  <h3 className="text-2xl font-serif text-white mb-2">Application Received!</h3>
+                  <h3 className="text-2xl font-serif text-white mb-2">
+                    {name ? `Welcome, ${name}!` : "Application Received!"}
+                  </h3>
                   <p className="text-slate-400 mb-6 text-sm">We've successfully processed your documents. <br/> A survey link has been generated based on your profile.</p>
                   
                     {extractedData && Object.keys(extractedData).length > 0 && (
@@ -296,6 +315,46 @@ export default function Hero() {
                           <p className="text-[9px] text-slate-600 mt-1">{licenseName ? "Ready" : "Photo or PDF"}</p>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Personal info fields */}
+                    <div className="space-y-3 pt-2">
+                      <input
+                        type="text"
+                        name="fullName"
+                        placeholder="Full name *"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          type="email"
+                          name="email"
+                          placeholder="Email address"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
+                        />
+                        <input
+                          type="tel"
+                          name="phone"
+                          placeholder="Phone number *"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          required
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        name="licenseNumber"
+                        placeholder="PNC License number"
+                        value={licenseNumber}
+                        onChange={(e) => setLicenseNumber(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
+                      />
                     </div>
 
                     <button 

@@ -230,6 +230,16 @@ export default function Survey() {
           <span className="badge badge-teal">H.M.S.P Nurse Survey 2026</span>
           <div className="hero-title">Home Nursing Platform — Nurse Registration & Viability Survey</div>
           <div className="hero-sub">This survey is for Registered Nurses in Pakistan. Your responses will help us build a better home nursing platform tailored to your needs. All data is kept strictly confidential and used only for product research. Estimated time: 8–12 minutes.</div>
+          {extractedData.extractedName && (
+            <div className="mt-4 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700/30 rounded-lg text-center">
+              <p className="text-brand-700 dark:text-brand-300 font-semibold text-sm">
+                Welcome, {extractedData.extractedName}! 👋
+              </p>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                We've pre-filled your details from the application. Please review and complete the survey below.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }}></div></div>
@@ -330,7 +340,7 @@ export default function Survey() {
             </div>
             <div className="field">
               <label>Professional qualification <span className="req">*</span></label>
-              <select onChange={updateProgress}>
+              <select defaultValue={extractedData.extractedEducation || ''} onChange={updateProgress}>
                 <option value="">Select highest qualification</option>
                 <option>Diploma in General Nursing (DGN)</option>
                 <option>Bachelor of Science in Nursing (BSN)</option>
