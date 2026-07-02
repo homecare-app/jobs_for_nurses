@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ShieldCheck, FileText, BadgeCheck, UploadCloud, CheckCircle2, Globe2 } from 'lucide-react';
+import { callEdgeFunction } from '../lib/supabase';
 
 export default function Hero() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,15 +118,10 @@ export default function Hero() {
       }
     }
 
-    // Fallback: try edge function
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`/api/extract`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
+      const data = await callEdgeFunction<{ extractedData: Record<string, string> }>('extract-info', formData);
       if (data.extractedData) {
         applyExtracted(data.extractedData);
       }
@@ -155,25 +151,20 @@ export default function Hero() {
     formData.set('certifications', certifications);
 
     try {
-      const response = await fetch(`/api/apply`, {
-        method: 'POST',
-        body: formData
-      });
+      const resData = await callEdgeFunction<{
+        success: boolean;
+        data?: { id: number };
+        extractedData: Record<string, string>;
+        message?: string;
+      }>('submit-apply', formData);
 
-      if (!response.ok) {
+      if (!resData.success) {
         throw new Error('Failed to submit application');
       }
-      
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Server returned an invalid response. Please try again.");
-      }
-
-      const resData = await response.json();
 
       setIsSuccess(true);
       // Store applicationId from server response for survey linking
-      const appId = resData?.applicationId || null;
+      const appId = resData?.data?.id || null;
       sessionStorage.setItem('applicationId', appId ? String(appId) : '');
 
       // Merge API extracted data with user-typed form data

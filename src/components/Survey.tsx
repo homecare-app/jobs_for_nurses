@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 
 import './Survey.css';
+import { supabase } from '../lib/supabase';
 
 export default function Survey() {
   const location = useLocation();
@@ -169,19 +170,14 @@ export default function Survey() {
     try {
       const surveyData = collectSurveyData();
       const applicationId = extractedData.applicationId || sessionStorage.getItem('applicationId') || null;
-      const response = await fetch('/api/survey', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ surveyData, extractedData, applicationId }),
+      const { error } = await supabase.from('survey_responses').insert({
+        survey_data: surveyData,
+        extracted_data: extractedData,
+        application_id: applicationId,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit survey');
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error('Survey submission was not accepted');
+      if (error) {
+        throw new Error(error.message);
       }
 
       setIsSubmitted(true);
