@@ -7,6 +7,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function(){var r=sessionStorage.getItem('redirectPath');if(r&&r!=='/'&&location.pathname==='/jobs_for_nurses/'){sessionStorage.removeItem('redirectPath');history.replaceState({},'','/jobs_for_nurses'+r)}})();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

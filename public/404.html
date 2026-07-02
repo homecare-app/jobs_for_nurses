@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <script>
+    sessionStorage.setItem('redirectPath', location.pathname.replace('/jobs_for_nurses', '') || '/');
+    location.replace('/jobs_for_nurses/');
+  </script>
+</head>
+<body></body>
+</html>
