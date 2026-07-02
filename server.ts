@@ -37,6 +37,11 @@ async function startServer() {
   // Middleware to parse JSON bodies
   app.use(express.json());
 
+  // Health check for Render
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.json({ status: "ok", uptime: process.uptime() });
+  });
+
   // API routes FIRST
   app.post("/api/extract", upload.single('file'), async (req: Request, res: Response) => {
     try {
@@ -100,30 +105,33 @@ async function startServer() {
         return res.json({ success: true, simulated: true, extractedData, message: "Application received. (Simulated — Supabase not configured)" });
       }
 
-      let dbData = null;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      // We'll store both the user-provided data and the AI extracted data
       const { data, error } = await supabase
         .from("nursing_applications")
-        .insert([{ 
-          full_name: finalName, 
-          phone: finalPhone, 
-          email: finalEmail, 
+        .insert([{
+          full_name: finalName,
+          phone: finalPhone,
+          email: finalEmail,
           license_number: finalLicense,
+          address: extractedData.extractedAddress,
+          languages: extractedData.extractedLanguages,
+          education: extractedData.extractedEducation,
+          experience: extractedData.extractedExperience,
+          skills: extractedData.extractedSkills,
+          certifications: extractedData.extractedCertifications,
           ai_extracted_data: extractedData,
-          survey_link_sent: true // simulated survey link sending
-        }]);
+          survey_link_sent: true
+        }])
+        .select('id')
+        .single();
 
       if (error) {
         console.warn("Supabase insert error (handled):", error);
-        // Do not throw here, instead we can proceed and tell the user it was received but simulated
         return res.json({ success: true, simulated: true, extractedData, message: "Application received. (Database insert failed - Simulated)" });
-      } else {
-        dbData = data;
       }
 
-      res.json({ success: true, data: dbData, extractedData, message: "Application received and survey link generated." });
+      res.json({ success: true, extractedData, applicationId: data?.id, message: "Application received and survey link generated." });
     } catch (error) {
       console.error("Application error:", error);
       const message = error instanceof Error ? error.message : "Failed to submit application";
@@ -136,6 +144,7 @@ async function startServer() {
     try {
       const surveyData = req.body?.surveyData || {};
       const extracted = req.body?.extractedData || {};
+      const applicationId = req.body?.applicationId || null;
 
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -152,7 +161,7 @@ async function startServer() {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       const { error: insertError } = await supabase
         .from("survey_responses")
-        .insert([{ survey_data: surveyData, extracted_data: extracted, submitted_at: new Date().toISOString() }]);
+        .insert([{ survey_data: surveyData, extracted_data: extracted, application_id: applicationId, submitted_at: new Date().toISOString() }]);
 
       if (insertError) {
         console.warn("Survey insert error (handled):", insertError);

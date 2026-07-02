@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ShieldCheck, FileText, BadgeCheck, UploadCloud, CheckCircle2, Globe2 } from 'lucide-react';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
 export default function Hero() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -25,6 +23,72 @@ export default function Hero() {
   const [skills, setSkills] = useState('');
   const [certifications, setCertifications] = useState('');
 
+  // Parse text content client-side to extract fields
+  const extractFromText = (text: string) => {
+    const result: Record<string, string> = {};
+    const mName = text.match(/(?:Name|name|Candidate|Nurse|Dr\.)\s*:\s*([A-Za-z\s.]+)/);
+    if (mName) result.extractedName = mName[1].trim();
+    else {
+      const dr = text.match(/(Dr\.\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+      if (dr) result.extractedName = dr[1].trim();
+    }
+    const mEmail = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (mEmail) result.extractedEmail = mEmail[1].trim();
+    const mPhone = text.match(/(?:\+92|0|92)?[\s-]?3\d{2}[\s-]?\d{7}/);
+    if (mPhone) {
+      let p = mPhone[0].replace(/[\s-]/g, '');
+      if (p.startsWith('0')) p = '+92' + p.substring(1);
+      else if (p.startsWith('92') && !p.startsWith('+92')) p = '+' + p;
+      else if (!p.startsWith('+')) p = '+92' + p;
+      if (p.startsWith('+92') && p.length >= 12) {
+        result.extractedPhone = '+92 ' + p.substring(3, 6) + ' ' + p.substring(6);
+      } else {
+        result.extractedPhone = p;
+      }
+    }
+    const mPnc = text.match(/(?:PNC|Pnc|pnc)[\s-]*(\d{4,10})/);
+    if (mPnc) result.extractedLicense = 'PNC-' + mPnc[1];
+    else {
+      const mLic = text.match(/(?:License|Licence|license|licence)\s*:\s*([A-Za-z0-9-]+)/i);
+      if (mLic) result.extractedLicense = mLic[1].trim();
+    }
+    const mAddr = text.match(/(?:Address|address)\s*:\s*(.+)/);
+    if (mAddr) result.extractedAddress = mAddr[1].trim();
+    const mLang = text.match(/(?:Languages|languages)\s*:\s*(.+)/);
+    if (mLang) result.extractedLanguages = mLang[1].trim();
+    const mEdu = text.match(/(?:Education|Qualification|qualification|education)\s*:\s*(.+)/);
+    if (mEdu) result.extractedEducation = mEdu[1].trim();
+    const mExp = text.match(/(?:Experience|experience)\s*:\s*(.+)/);
+    if (mExp) result.extractedExperience = mExp[1].trim();
+    const mSkills = text.match(/(?:Skills|skills)\s*:\s*(.+)/);
+    if (mSkills) result.extractedSkills = mSkills[1].trim();
+    const mCert = text.match(/(?:Certifications|certifications)\s*:\s*(.+)/);
+    if (mCert) result.extractedCertifications = mCert[1].trim();
+    return result;
+  };
+
+  // Apply extracted fields to React state
+  const applyExtracted = (ed: Record<string, string>) => {
+    if (ed.extractedName && !name) setName(ed.extractedName);
+    if (ed.extractedEmail && !email) setEmail(ed.extractedEmail);
+    if (ed.extractedLicense && !licenseNumber) setLicenseNumber(ed.extractedLicense);
+    if (ed.extractedPhone && !phone) {
+      let val = ed.extractedPhone.replace(/\D/g, '');
+      if (val.startsWith('92')) val = val.substring(2);
+      else if (val.startsWith('0')) val = val.substring(1);
+      let formatted = '+92';
+      if (val.length > 0) formatted += ' ' + val.substring(0, 3);
+      if (val.length > 3) formatted += ' ' + val.substring(3, 10);
+      setPhone(formatted);
+    }
+    if (ed.extractedAddress && !address) setAddress(ed.extractedAddress);
+    if (ed.extractedLanguages && !languages) setLanguages(ed.extractedLanguages);
+    if (ed.extractedEducation && !education) setEducation(ed.extractedEducation);
+    if (ed.extractedExperience && !experience) setExperience(ed.extractedExperience);
+    if (ed.extractedSkills && !skills) setSkills(ed.extractedSkills);
+    if (ed.extractedCertifications && !certifications) setCertifications(ed.extractedCertifications);
+  };
+
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>, type: 'cv' | 'pnc') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -33,37 +97,37 @@ export default function Hero() {
     if (type === 'pnc') setLicenseName(file.name);
 
     setIsExtracting(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
+    // Client-side text extraction (works immediately, no edge function deploy needed)
+    const fileName = file.name.toLowerCase();
+    const textExt = ['.txt', '.csv', '.json', '.md'];
+    const isTextFile = textExt.some(ext => fileName.endsWith(ext));
+
+    if (isTextFile) {
+      try {
+        const text = await file.text();
+        const extracted = extractFromText(text);
+        if (Object.keys(extracted).length > 0) {
+          applyExtracted(extracted);
+          setIsExtracting(false);
+          return;
+        }
+      } catch {
+        // Fall through to edge function
+      }
+    }
+
+    // Fallback: try edge function
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-info`, {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`/api/extract`, {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
       if (data.extractedData) {
-        const ed = data.extractedData;
-        if (ed.extractedName && !name) setName(ed.extractedName);
-        if (ed.extractedEmail && !email) setEmail(ed.extractedEmail);
-        if (ed.extractedLicense && !licenseNumber) setLicenseNumber(ed.extractedLicense);
-        if (ed.extractedPhone && !phone) {
-          let val = ed.extractedPhone.replace(/\D/g, '');
-          if (val.startsWith('92')) val = val.substring(2);
-          else if (val.startsWith('0')) val = val.substring(1);
-          let formatted = '+92';
-          if (val.length > 0) formatted += ' ' + val.substring(0, 3);
-          if (val.length > 3) formatted += ' ' + val.substring(3, 10);
-          setPhone(formatted);
-        }
-        if (ed.extractedAddress && !address) setAddress(ed.extractedAddress);
-        if (ed.extractedLanguages && !languages) setLanguages(ed.extractedLanguages);
-        if (ed.extractedEducation && !education) setEducation(ed.extractedEducation);
-        if (ed.extractedExperience && !experience) setExperience(ed.extractedExperience);
-        if (ed.extractedSkills && !skills) setSkills(ed.extractedSkills);
-        if (ed.extractedCertifications && !certifications) setCertifications(ed.extractedCertifications);
-
-
+        applyExtracted(data.extractedData);
       }
     } catch (err) {
       console.error("Extraction error:", err);
@@ -91,9 +155,9 @@ export default function Hero() {
     formData.set('certifications', certifications);
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/submit-apply`, {
+      const response = await fetch(`/api/apply`, {
         method: 'POST',
-        body: formData, // Send the FormData directly
+        body: formData
       });
 
       if (!response.ok) {
@@ -108,9 +172,13 @@ export default function Hero() {
       const resData = await response.json();
 
       setIsSuccess(true);
+      // Store applicationId from server response for survey linking
+      const appId = resData?.applicationId || null;
+      sessionStorage.setItem('applicationId', appId ? String(appId) : '');
+
       // Merge API extracted data with user-typed form data
       const apiExtracted = resData?.extractedData || {};
-      setExtractedData({
+      const merged = {
         extractedName: name || apiExtracted.extractedName,
         extractedEmail: email || apiExtracted.extractedEmail,
         extractedPhone: phone || apiExtracted.extractedPhone,
@@ -121,7 +189,9 @@ export default function Hero() {
         extractedExperience: experience || apiExtracted.extractedExperience,
         extractedSkills: skills || apiExtracted.extractedSkills,
         extractedCertifications: certifications || apiExtracted.extractedCertifications,
-      });
+        applicationId: appId,
+      };
+      setExtractedData(merged);
       form.reset();
       setCvName(null);
       setLicenseName(null);
@@ -315,46 +385,6 @@ export default function Hero() {
                           <p className="text-[9px] text-slate-600 mt-1">{licenseName ? "Ready" : "Photo or PDF"}</p>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Personal info fields */}
-                    <div className="space-y-3 pt-2">
-                      <input
-                        type="text"
-                        name="fullName"
-                        placeholder="Full name *"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
-                      />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                          type="email"
-                          name="email"
-                          placeholder="Email address"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
-                        />
-                        <input
-                          type="tel"
-                          name="phone"
-                          placeholder="Phone number *"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          required
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        name="licenseNumber"
-                        placeholder="PNC License number"
-                        value={licenseNumber}
-                        onChange={(e) => setLicenseNumber(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:bg-white/[0.07] transition-all"
-                      />
                     </div>
 
                     <button 

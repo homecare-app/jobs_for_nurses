@@ -168,10 +168,11 @@ export default function Survey() {
 
     try {
       const surveyData = collectSurveyData();
+      const applicationId = extractedData.applicationId || sessionStorage.getItem('applicationId') || null;
       const response = await fetch('/api/survey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ surveyData, extractedData }),
+        body: JSON.stringify({ surveyData, extractedData, applicationId }),
       });
 
       if (!response.ok) {
