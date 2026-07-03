@@ -1,7 +1,7 @@
 const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const FETCH_TIMEOUT_MS = 8_000;
+const FETCH_TIMEOUT_MS = 20_000;
 const MAX_RETRIES = 1;
 
 const corsHeaders = {
@@ -83,15 +83,13 @@ function getMimeType(fileName: string): string {
   if (name.endsWith(".pdf")) return "application/pdf";
   if (name.endsWith(".png")) return "image/png";
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (name.endsWith(".doc")) return "application/msword";
   return "application/octet-stream";
 }
 
-function isImage(mime: string): boolean {
-  return mime.startsWith("image/");
-}
-
-function isPdf(mime: string): boolean {
-  return mime === "application/pdf";
+function isDocument(mime: string): boolean {
+  return mime.startsWith("image/") || mime === "application/pdf" || mime.includes("officedocument") || mime === "application/msword";
 }
 
 function isTextFile(fileName: string): boolean {
@@ -99,11 +97,28 @@ function isTextFile(fileName: string): boolean {
   return name.endsWith(".txt") || name.endsWith(".csv") || name.endsWith(".json") || name.endsWith(".md");
 }
 
-const GEMINI_INSTRUCTION = `You are extracting information from a nursing CV/resume or PNC license document.
-Extract the following fields and return them as a JSON object.
-Use these exact keys: name, email, phone, pnc_license_number, address, languages, education, experience, skills, certifications.
-If a field is not found, omit it from the JSON.
-Return ONLY valid JSON with no markdown formatting.`;
+const GEMINI_INSTRUCTION = `You are a precise OCR extraction engine for nursing CV/resume and PNC license documents from Pakistan.
+
+Extract the following fields from the document. Look for them even if they appear in different formats, tables, or layouts. Be thorough — scan the entire document.
+
+Required fields (output JSON keys):
+- name: Full name of the candidate (e.g. "Fatima Akhtar")
+- email: Email address
+- phone: Phone number with country code (Pakistan: +92...)
+- pnc_license_number: PNC license number (e.g. "PNC-12345" or just "12345")
+- address: Full residential address
+- languages: Languages spoken (comma separated)
+- education: Educational qualifications (e.g. "BSN, Post-RN")
+- experience: Professional experience summary
+- skills: Clinical/technical skills (comma separated)
+- certifications: Professional certifications (e.g. "ACLS, BLS, PALS")
+
+Rules:
+- If a field is not found anywhere in the document, omit it from the JSON.
+- Extract the EXACT text — do not paraphrase.
+- For phone numbers, use international format.
+- For PNC license, look for "PNC" followed by numbers, or just a 4-10 digit number near "License" or "Licence".
+- Return ONLY valid JSON with no markdown formatting, no code blocks, no extra text.`;
 
 async function callGemini(file: File): Promise<Record<string, string> | null> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
@@ -116,7 +131,7 @@ async function callGemini(file: File): Promise<Record<string, string> | null> {
   if (isTextFile(file.name)) {
     const text = await file.text();
     parts = [{ text: GEMINI_INSTRUCTION + "\n\nDocument content:\n" + text }];
-  } else if (isImage(mimeType) || isPdf(mimeType)) {
+  } else if (isDocument(mimeType)) {
     const base64 = await fileToBase64(file);
     parts = [
       { text: GEMINI_INSTRUCTION },
