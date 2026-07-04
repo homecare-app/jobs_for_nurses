@@ -118,6 +118,8 @@ Rules:
 - For PNC license, look for "PNC" followed by numbers, or just a 4-10 digit number near "License" or "Licence".
 - Return ONLY valid JSON with no markdown formatting, no code blocks, no extra text.`;
 
+const POLLINATIONS_URL = "https://text.pollinations.ai/openai/chat/completions";
+
 async function extractDocxText(file: File): Promise<{ text: string; debug: Record<string, unknown> }> {
   const debug: Record<string, unknown> = {};
   try {
@@ -131,6 +133,7 @@ async function extractDocxText(file: File): Promise<{ text: string; debug: Recor
       const result = await mammoth.extractRawText({ buffer });
       debug.mammothChars = result.value?.length ?? 0;
       debug.mammothMessages = result.messages;
+      debug.textPreview = (result.value || "").slice(0,200);
       if (result.value) return { text: result.value, debug };
     } catch (e: any) {
       debug.mammothError = e.message;
@@ -170,6 +173,7 @@ async function extractDocxText(file: File): Promise<{ text: string; debug: Recor
             if (texts) {
               const text = texts.map((t: string) => t.replace(/<\/?w:t[^>]*>/g, "")).join(" ").replace(/\s+/g, " ").trim();
               debug.method = "zip-stored";
+              debug.textPreview = text.slice(0,200);
               return { text, debug };
             }
           }
@@ -197,6 +201,7 @@ async function extractDocxText(file: File): Promise<{ text: string; debug: Recor
                 const text = texts.map((t: string) => t.replace(/<\/?w:t[^>]*>/g, "")).join(" ").replace(/\s+/g, " ").trim();
                 debug.method = "zip-deflate";
                 debug.decompressedLen = combined.length;
+                debug.textPreview = text.slice(0,200);
                 return { text, debug };
               }
             } catch (e: any) {
@@ -220,60 +225,88 @@ async function extractDocxText(file: File): Promise<{ text: string; debug: Recor
   }
 }
 
-async function callGeminiWithText(text: string): Promise<Record<string, string> | null> {
+async function callAiWithText(text: string, debug?: Record<string, unknown>): Promise<Record<string, string> | null> {
+  const prompt = GEMINI_INSTRUCTION + "\n\nDocument content:\n" + text;
+
+  try {
+    const polliBody = { model: "openai", messages: [{ role: "user", content: prompt }], temperature: 0.1 };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const res = await fetch(POLLINATIONS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(polliBody),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const json = await res.json();
+      const content = json?.choices?.[0]?.message?.content;
+      if (content) {
+        debug && (debug.polliRaw = content.slice(0,500));
+        const result = parseAnyJsonResponse(content);
+        if (result) return result;
+      }
+    } else {
+      debug && (debug.polliStatus = res.status);
+    }
+  } catch (e) {
+    debug && (debug.polliError = String(e));
+  }
+
   const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) return null;
+  if (!apiKey) { debug && (debug.geminiError = "no api key"); return null; }
 
   const body = {
-    contents: [{ parts: [{ text: GEMINI_INSTRUCTION + "\n\nDocument content:\n" + text }] }],
+    contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
   };
+  debug && (debug.geminiBodyLen = JSON.stringify(body).length);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
       const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
-
       clearTimeout(timer);
-
       if (!res.ok) {
         const errText = await res.text();
         console.error(`Gemini text API error (${res.status}): ${errText}`);
+        debug && (debug.geminiHttpStatus = res.status);
+        debug && (debug.geminiHttpBody = errText.slice(0,500));
         if (res.status === 429 && attempt < MAX_RETRIES) {
+          debug && (debug.geminiRetry = true);
           await new Promise(r => setTimeout(r, 3000));
           continue;
         }
         return null;
       }
-
       const result = await res.json();
-      return parseGeminiResponse(result);
+      const textContent = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (textContent) {
+        debug && (debug.geminiRaw = textContent.slice(0,500));
+        return parseAnyJsonResponse(textContent);
+      }
     } catch (err) {
-      console.error(`Gemini text attempt ${attempt + 1} failed:`, err);
+      console.error(`Gemini attempt ${attempt + 1} failed:`, err);
+      debug && (debug.geminiCatchError = String(err));
       if (attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, 1000));
         continue;
       }
-      return null;
     }
   }
   return null;
 }
 
-function parseGeminiResponse(result: any): Record<string, string> | null {
-  const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) return null;
-
+function parseAnyJsonResponse(text: string): Record<string, string> | null {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
-
   try {
     const parsed = JSON.parse(jsonMatch[0]);
     const mapped: Record<string, string> = {};
@@ -302,6 +335,7 @@ function parseGeminiResponse(result: any): Record<string, string> | null {
   return null;
 }
 
+
 async function callGemini(file: File): Promise<Record<string, string> | null> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return null;
@@ -310,7 +344,7 @@ async function callGemini(file: File): Promise<Record<string, string> | null> {
 
   if (isTextFile(file.name)) {
     const text = await file.text();
-    return await callGeminiWithText(text);
+    return await callAiWithText(text);
   }
 
   if (mimeType.startsWith("image/") || mimeType === "application/pdf") {
@@ -344,7 +378,8 @@ async function callGemini(file: File): Promise<Record<string, string> | null> {
           return null;
         }
         const result = await res.json();
-        return parseGeminiResponse(result);
+        const textContent = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textContent) return parseAnyJsonResponse(textContent);
       } catch (err) {
         console.error(`Gemini attempt ${attempt + 1} failed:`, err);
         if (attempt < MAX_RETRIES) {
@@ -417,12 +452,14 @@ Deno.serve(async (req: Request) => {
           const { text: docxText, debug } = await extractDocxText(file);
           docxDebug = debug;
           if (docxText) {
-            const geminiResult = await callGeminiWithText(docxText);
+            const geminiResult = await callAiWithText(docxText, docxDebug);
             if (geminiResult && Object.keys(geminiResult).length > 0) {
               geminiResults.push(geminiResult);
             } else {
               warnings.push(`Could not extract data from ${file.name}`);
             }
+            docxDebug.geminiResult = geminiResult;
+            debugDocx.push(docxDebug);
             continue;
           }
         } catch (e: any) {
@@ -449,12 +486,17 @@ Deno.serve(async (req: Request) => {
       extractedData = extractViaRegex(combinedText);
     }
 
+    const fileInfo = filesToProcess.map(f => ({ name: f.file.name, size: f.file.size, type: f.file.type, isDocx: f.file.name.endsWith(".docx") }));
+    const docxInfo = debugDocx.map(d => (typeof d === 'object' ? JSON.stringify(d).slice(0,800) : String(d)));
+
     return new Response(
       JSON.stringify({
         extractedData,
         warnings: warnings.length > 0 ? warnings : undefined,
         _debugDocx: debugDocx.length > 0 ? debugDocx : undefined,
-        _version: "mammoth-v2",
+        _files: fileInfo,
+        _docxDebugRaw: docxInfo,
+        _version: "mammoth-v3",
       }),
       { headers: corsHeaders },
     );
