@@ -162,9 +162,9 @@ async function extractDocxText(file: File): Promise<{ text: string; debug: Recor
         if (fileName === "word/document.xml") {
           const dataStart = offset + 30 + nameLen + extraLen;
           
+          const xmlBytes = view.slice(dataStart, dataStart + compSize);
+
           if (compMethod === 0) {
-            // Stored (no compression)
-            const xmlBytes = view.slice(dataStart, dataStart + compSize);
             const docXml = decoder.decode(xmlBytes);
             const texts = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
             if (texts) {
@@ -173,9 +173,36 @@ async function extractDocxText(file: File): Promise<{ text: string; debug: Recor
               return { text, debug };
             }
           }
-          
-          debug.method = "zip-deflate";
-          debug.note = `compMethod=${compMethod}, compSize=${compSize} — deflate not supported in Deno`;
+
+          if (compMethod === 8) {
+            try {
+              const ds = new DecompressionStream("deflate-raw");
+              const writer = ds.writable.getWriter();
+              writer.write(xmlBytes);
+              writer.close();
+              const reader = ds.readable.getReader();
+              const chunks: Uint8Array[] = [];
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+              }
+              const totalLen = chunks.reduce((s, c) => s + c.byteLength, 0);
+              const combined = new Uint8Array(totalLen);
+              let pos = 0;
+              for (const c of chunks) { combined.set(c, pos); pos += c.byteLength; }
+              const docXml = decoder.decode(combined);
+              const texts = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+              if (texts) {
+                const text = texts.map((t: string) => t.replace(/<\/?w:t[^>]*>/g, "")).join(" ").replace(/\s+/g, " ").trim();
+                debug.method = "zip-deflate";
+                debug.decompressedLen = combined.length;
+                return { text, debug };
+              }
+            } catch (e: any) {
+              debug.deflateError = e.message;
+            }
+          }
         }
         
         offset += 30 + nameLen + extraLen + compSize;
