@@ -395,6 +395,80 @@ export default function Hero() {
                       </div>
                     )}
 
+                    {extractionError && (
+                      <div className="space-y-3 pt-2 animate-fadeIn">
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Manual Entry</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Full Name</label>
+                            <input type="text" value={name} onChange={e => setName(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. Fatima Akhtar" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Email</label>
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. nurse@example.com" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Phone</label>
+                            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="+92 300 1234567" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">PNC License #</label>
+                            <input type="text" value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. PNC-12345" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Address</label>
+                          <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                            placeholder="e.g. 123 Garden Road, Lahore" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Languages</label>
+                            <input type="text" value={languages} onChange={e => setLanguages(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. Urdu, English" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Education</label>
+                            <input type="text" value={education} onChange={e => setEducation(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. BSN, Post-RN" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Experience</label>
+                          <textarea rows={2} value={experience} onChange={e => setExperience(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors resize-none"
+                            placeholder="e.g. 5 years at Mayo Hospital, Lahore"></textarea>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Skills</label>
+                            <input type="text" value={skills} onChange={e => setSkills(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. ICU, Critical Care" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Certifications</label>
+                            <input type="text" value={certifications} onChange={e => setCertifications(e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+                              placeholder="e.g. ACLS, BLS, PALS" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <button 
                       type="submit" 
                       disabled={isSubmitting || isExtracting}

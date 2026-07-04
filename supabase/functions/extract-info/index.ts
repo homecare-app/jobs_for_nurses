@@ -1,8 +1,10 @@
+import mammoth from "npm:mammoth@1.6.0";
+
 const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 20_000;
-const MAX_RETRIES = 1;
+const MAX_RETRIES = 2;
 
 const corsHeaders = {
   "Content-Type": "application/json",
@@ -88,10 +90,6 @@ function getMimeType(fileName: string): string {
   return "application/octet-stream";
 }
 
-function isDocument(mime: string): boolean {
-  return mime.startsWith("image/") || mime === "application/pdf" || mime.includes("officedocument") || mime === "application/msword";
-}
-
 function isTextFile(fileName: string): boolean {
   const name = fileName.toLowerCase();
   return name.endsWith(".txt") || name.endsWith(".csv") || name.endsWith(".json") || name.endsWith(".md");
@@ -120,33 +118,88 @@ Rules:
 - For PNC license, look for "PNC" followed by numbers, or just a 4-10 digit number near "License" or "Licence".
 - Return ONLY valid JSON with no markdown formatting, no code blocks, no extra text.`;
 
-async function callGemini(file: File): Promise<Record<string, string> | null> {
+async function extractDocxText(file: File): Promise<{ text: string; debug: Record<string, unknown> }> {
+  const debug: Record<string, unknown> = {};
+  try {
+    const buffer = await file.arrayBuffer();
+    debug.bufferSize = buffer.byteLength;
+    debug.fileSize = file.size;
+    debug.fileName = file.name;
+    
+    // Try mammoth
+    try {
+      const result = await mammoth.extractRawText({ buffer });
+      debug.mammothChars = result.value?.length ?? 0;
+      debug.mammothMessages = result.messages;
+      if (result.value) return { text: result.value, debug };
+    } catch (e: any) {
+      debug.mammothError = e.message;
+    }
+    
+    // Fallback: manual ZIP parse
+    try {
+      const view = new Uint8Array(buffer);
+      const decoder = new TextDecoder();
+      let offset = 0;
+      const entries: string[] = [];
+      
+      while (offset < view.length - 30) {
+        if (view[offset] !== 0x50 || view[offset + 1] !== 0x4b ||
+            view[offset + 2] !== 0x03 || view[offset + 3] !== 0x04) {
+          offset++;
+          continue;
+        }
+        
+        const nameLen = view[offset + 26] | (view[offset + 27] << 8);
+        const extraLen = view[offset + 28] | (view[offset + 29] << 8);
+        const compMethod = view[offset + 8] | (view[offset + 9] << 8);
+        const compSize = view[offset + 18] | (view[offset + 19] << 8) |
+                         (view[offset + 20] << 16) | (view[offset + 21] << 24);
+        const fileName = decoder.decode(view.slice(offset + 30, offset + 30 + nameLen));
+        
+        entries.push(`${fileName}(m=${compMethod},cs=${compSize})`);
+        
+        if (fileName === "word/document.xml") {
+          const dataStart = offset + 30 + nameLen + extraLen;
+          
+          if (compMethod === 0) {
+            // Stored (no compression)
+            const xmlBytes = view.slice(dataStart, dataStart + compSize);
+            const docXml = decoder.decode(xmlBytes);
+            const texts = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+            if (texts) {
+              const text = texts.map((t: string) => t.replace(/<\/?w:t[^>]*>/g, "")).join(" ").replace(/\s+/g, " ").trim();
+              debug.method = "zip-stored";
+              return { text, debug };
+            }
+          }
+          
+          debug.method = "zip-deflate";
+          debug.note = `compMethod=${compMethod}, compSize=${compSize} — deflate not supported in Deno`;
+        }
+        
+        offset += 30 + nameLen + extraLen + compSize;
+      }
+      
+      debug.entries = entries;
+    } catch (e: any) {
+      debug.zipError = e.message;
+    }
+    
+    return { text: "", debug };
+  } catch (err: any) {
+    debug.topError = err.message;
+    return { text: "", debug };
+  }
+}
+
+async function callGeminiWithText(text: string): Promise<Record<string, string> | null> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return null;
 
-  const mimeType = getMimeType(file.name);
-
-  let parts: Array<Record<string, unknown>>;
-
-  if (isTextFile(file.name)) {
-    const text = await file.text();
-    parts = [{ text: GEMINI_INSTRUCTION + "\n\nDocument content:\n" + text }];
-  } else if (isDocument(mimeType)) {
-    const base64 = await fileToBase64(file);
-    parts = [
-      { text: GEMINI_INSTRUCTION },
-      { inlineData: { mimeType, data: base64 } },
-    ];
-  } else {
-    return null;
-  }
-
   const body = {
-    contents: [{ parts }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 1024,
-    },
+    contents: [{ parts: [{ text: GEMINI_INSTRUCTION + "\n\nDocument content:\n" + text }] }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
   };
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -165,56 +218,117 @@ async function callGemini(file: File): Promise<Record<string, string> | null> {
 
       if (!res.ok) {
         const errText = await res.text();
-        console.error(`Gemini API error (${res.status}): ${errText}`);
-        if (attempt < MAX_RETRIES) continue;
+        console.error(`Gemini text API error (${res.status}): ${errText}`);
+        if (res.status === 429 && attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
         return null;
       }
 
       const result = await res.json();
-      const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) {
-        if (attempt < MAX_RETRIES) continue;
-        return null;
-      }
-
-      // Try to extract JSON from response (handle markdown-wrapped JSON)
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        if (attempt < MAX_RETRIES) continue;
-        return null;
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-      const mapped: Record<string, string> = {};
-      if (parsed.name) mapped.extractedName = String(parsed.name);
-      if (parsed.email) mapped.extractedEmail = String(parsed.email);
-      if (parsed.phone) {
-        let p = String(parsed.phone).replace(/\s+/g, "");
-        if (p.startsWith("0")) p = "+92" + p.substring(1);
-        else if (p.startsWith("92") && !p.startsWith("+92")) p = "+" + p;
-        else if (!p.startsWith("+")) p = "+92" + p;
-        if (p.startsWith("+92") && p.length >= 12) {
-          mapped.extractedPhone = "+92 " + p.substring(3, 6) + " " + p.substring(6);
-        } else {
-          mapped.extractedPhone = p;
-        }
-      }
-      if (parsed.pnc_license_number) mapped.extractedLicense = String(parsed.pnc_license_number);
-      if (parsed.address) mapped.extractedAddress = String(parsed.address);
-      if (parsed.languages) mapped.extractedLanguages = String(parsed.languages);
-      if (parsed.education) mapped.extractedEducation = String(parsed.education);
-      if (parsed.experience) mapped.extractedExperience = String(parsed.experience);
-      if (parsed.skills) mapped.extractedSkills = String(parsed.skills);
-      if (parsed.certifications) mapped.extractedCertifications = String(parsed.certifications);
-
-      if (Object.keys(mapped).length > 0) return mapped;
-      return null;
+      return parseGeminiResponse(result);
     } catch (err) {
-      console.error(`Gemini attempt ${attempt + 1} failed:`, err);
-      if (attempt < MAX_RETRIES) continue;
+      console.error(`Gemini text attempt ${attempt + 1} failed:`, err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
       return null;
     }
   }
+  return null;
+}
+
+function parseGeminiResponse(result: any): Record<string, string> | null {
+  const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return null;
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    const mapped: Record<string, string> = {};
+    if (parsed.name) mapped.extractedName = String(parsed.name);
+    if (parsed.email) mapped.extractedEmail = String(parsed.email);
+    if (parsed.phone) {
+      let p = String(parsed.phone).replace(/\s+/g, "");
+      if (p.startsWith("0")) p = "+92" + p.substring(1);
+      else if (p.startsWith("92") && !p.startsWith("+92")) p = "+" + p;
+      else if (!p.startsWith("+")) p = "+92" + p;
+      if (p.startsWith("+92") && p.length >= 12) {
+        mapped.extractedPhone = "+92 " + p.substring(3, 6) + " " + p.substring(6);
+      } else {
+        mapped.extractedPhone = p;
+      }
+    }
+    if (parsed.pnc_license_number) mapped.extractedLicense = String(parsed.pnc_license_number);
+    if (parsed.address) mapped.extractedAddress = String(parsed.address);
+    if (parsed.languages) mapped.extractedLanguages = String(parsed.languages);
+    if (parsed.education) mapped.extractedEducation = String(parsed.education);
+    if (parsed.experience) mapped.extractedExperience = String(parsed.experience);
+    if (parsed.skills) mapped.extractedSkills = String(parsed.skills);
+    if (parsed.certifications) mapped.extractedCertifications = String(parsed.certifications);
+    if (Object.keys(mapped).length > 0) return mapped;
+  } catch {}
+  return null;
+}
+
+async function callGemini(file: File): Promise<Record<string, string> | null> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) return null;
+
+  const mimeType = getMimeType(file.name);
+
+  if (isTextFile(file.name)) {
+    const text = await file.text();
+    return await callGeminiWithText(text);
+  }
+
+  if (mimeType.startsWith("image/") || mimeType === "application/pdf") {
+    const base64 = await fileToBase64(file);
+    const body = {
+      contents: [{ parts: [
+        { text: GEMINI_INSTRUCTION + "\n\nThis is a scanned document or image. Extract all text content from it." },
+        { inlineData: { mimeType, data: base64 } },
+      ] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+    };
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error(`Gemini API error (${res.status}): ${errText}`);
+          if (res.status === 429 && attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, 3000));
+            continue;
+          }
+          return null;
+        }
+        const result = await res.json();
+        return parseGeminiResponse(result);
+      } catch (err) {
+        console.error(`Gemini attempt ${attempt + 1} failed:`, err);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+      }
+    }
+    return null;
+  }
+
   return null;
 }
 
@@ -259,49 +373,61 @@ Deno.serve(async (req: Request) => {
       filesToProcess.push({ file, source: key });
     }
 
-    // Try Gemini first for each file
     const geminiResults: Array<Record<string, string>> = [];
     const textFallbacks: string[] = [];
+    const debugDocx: Record<string, unknown>[] = [];
 
     for (const { file, source } of filesToProcess) {
-      // For text files, read text directly as fallback
       if (isTextFile(file.name)) {
         textFallbacks.push(await file.text());
+      }
+
+      const isDocx = file.name.endsWith(".docx") || file.name.endsWith(".doc");
+      let docxDebug: Record<string, unknown> | undefined;
+
+      if (isDocx) {
+        try {
+          const { text: docxText, debug } = await extractDocxText(file);
+          docxDebug = debug;
+          if (docxText) {
+            const geminiResult = await callGeminiWithText(docxText);
+            if (geminiResult && Object.keys(geminiResult).length > 0) {
+              geminiResults.push(geminiResult);
+            } else {
+              warnings.push(`Could not extract data from ${file.name}`);
+            }
+            continue;
+          }
+        } catch (e: any) {
+          docxDebug = { error: e.message, stack: e.stack };
+        }
       }
 
       const geminiResult = await callGemini(file);
       if (geminiResult && Object.keys(geminiResult).length > 0) {
         geminiResults.push(geminiResult);
-        console.log(`Gemini succeeded for ${source}:${file.name}`);
-      } else {
-        console.log(`Gemini failed for ${source}:${file.name}, will use regex fallback`);
-        if (isTextFile(file.name)) {
-          // Already added to textFallbacks above
-        } else {
-          warnings.push(`Could not extract text from ${file.name} (unsupported format)`);
-        }
+      } else if (!isTextFile(file.name)) {
+        warnings.push(`Could not extract data from ${file.name}`);
       }
+
+      if (isDocx && docxDebug) debugDocx.push(docxDebug);
     }
 
-    // Merge Gemini results (CV takes priority for overlapping fields)
     let extractedData: Record<string, string> = {};
     if (geminiResults.length > 0) {
       extractedData = mergeData(geminiResults);
     }
-
-    // Regex fallback for text files
     if (Object.keys(extractedData).length === 0 && textFallbacks.length > 0) {
       const combinedText = textFallbacks.join("\n---\n");
       extractedData = extractViaRegex(combinedText);
-      if (Object.keys(extractedData).length > 0) {
-        console.log("Regex fallback extracted data from text files");
-      }
     }
 
     return new Response(
       JSON.stringify({
         extractedData,
         warnings: warnings.length > 0 ? warnings : undefined,
+        _debugDocx: debugDocx.length > 0 ? debugDocx : undefined,
+        _version: "mammoth-v2",
       }),
       { headers: corsHeaders },
     );

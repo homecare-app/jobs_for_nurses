@@ -10,3 +10,4 @@ coverage/
 .playwright-mcp/
 responsive-*.png
 live-*.png
+.omp/
